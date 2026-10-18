@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block contenido %}
+<section class="bloque">
+  <h1>Revisa cada pedido antes de que llegue a cocina</h1>
+  <p class="enunciado">{{ enunciado }}</p>
+</section>
+
+<section class="bloque" id="caso">
+  <h2>A) Caso</h2>
+  <form method="post" enctype="multipart/form-data" class="entrada">
+    <div>
+      <label for="archivo">Subir archivo (.txt)</label>
+      <input type="file" id="archivo" name="archivo" accept=".txt">
+      <small>Si subes un archivo, se usa en lugar del cuadro de texto. Una línea = un pedido; las líneas con # se ignoran.</small>
+    </div>
+    <div>
+      <label for="texto">Escribir el lenguaje (un pedido por línea)</label>
+      <textarea id="texto" name="texto" rows="8" spellcheck="false">{{ texto }}</textarea>
+    </div>
+    <div class="acciones">
+      <button class="btn" type="submit">Analizar y compilar</button>
+      <button class="btn sec" type="button" id="btn-ejemplo" data-ejemplo="{{ ejemplo }}">Cargar ejemplo</button>
+    </div>
+  </form>
+  {% if error %}<p class="alerta" role="alert">{{ error }}</p>{% endif %}
+  <details>
+    <summary>Formato de un pedido válido</summary>
+    <p>Σ = {P, E, D, M, L, C, B, S, +, -, 0–9}</p>
+    <p><code>PED-NNN-UBICACIÓN-ÍTEM(+ÍTEM)*</code> — NNN es el correlativo (001–999); la ubicación es <code>M</code> + 1 o 2 dígitos (mesa), <code>D</code> (delivery) o <code>L</code> (para llevar); cada ítem es <code>C</code>, <code>B</code> o <code>S</code> + 2 dígitos.</p>
+  </details>
+</section>
+
+{% if resultados %}
+<section class="bloque" id="resultado">
+  <h2>B) Resultado</h2>
+  <div class="tickets">
+    {% for r in resultados %}
+    <article class="ticket {{ 'ok' if r.valido else 'mal' }}">
+      <p class="estado">{{ 'A cocina' if r.valido else 'Rechazado' }}</p>
+      <p class="cadena"><code>{{ r.cadena }}</code></p>
+      {% if r.valido %}
+        <p>{{ r.semantica.objeto.canal|capitalize }}{% if r.semantica.objeto.mesa %} {{ r.semantica.objeto.mesa }}{% endif %} · pedido {{ '%03d'|format(r.semantica.objeto.correlativo) }}</p>
+        <ul>{% for it in r.semantica.objeto['items'] %}<li>{{ it.categoria }} <code>{{ it.codigo }}</code></li>{% endfor %}</ul>
+        {% for a in r.semantica.avisos %}<p class="aviso">{{ a }}</p>{% endfor %}
+      {% else %}
+        <ul class="errores">{% for e in r.errores %}<li>{{ e }}</li>{% endfor %}</ul>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  <h3>Traducción a objeto de datos (JSON)</h3>
+  <pre class="codigo">{{ salida }}</pre>
+</section>
+{% endif %}
+
+<section class="bloque" id="proceso">
+  <h2>C) Proceso interno</h2>
+
+  <h3>3.1 Análisis léxico</h3>
+  <p>Tabla de tokens y expresiones regulares del lenguaje:</p>
+  <div class="tabla-scroll"><table>
+    <thead><tr><th>Token</th><th>Expresión regular</th><th>Descripción</th></tr></thead>
+    <tbody>{% for nombre, er, desc in tokens %}<tr><td><code>{{ nombre }}</code></td><td><code>{{ er }}</code></td><td>{{ desc }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+
+  {% if resultados %}
+  {% for r in resultados %}
+  <details {% if loop.first %}open{% endif %}>
+    <summary>Línea {{ r.n }}: <code>{{ r.cadena }}</code> — {{ 'válido' if r.valido else 'inválido' }}</summary>
+    <div class="tabla-scroll"><table>
+      <thead><tr><th>Lexema</th><th>Token asignado</th><th>Posición</th><th>Expresión regular</th></tr></thead>
+      <tbody>{% for t in r.tokens %}
+        <tr class="{{ 'fila-error' if t.tipo == 'ERROR' }}"><td><code>{{ t.lexema }}</code></td><td><code>{{ t.tipo }}</code></td><td>{{ t.posicion }}</td><td><code>{{ er_por_token.get(t.tipo, '— (no reconocido)') }}</code></td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    <p>Validación con el AFD del pedido completo: <strong>{{ 'acepta' if r.afd_acepta else 'rechaza' }}</strong> — recorrido: <code>{{ r.afd_camino|join(' → ') }}</code></p>
+  </details>
+  {% endfor %}
+  {% else %}
+  <p class="vacio">Analiza al menos un pedido para ver aquí sus lexemas, tokens y posiciones.</p>
+  {% endif %}
+
+  <h3>3.2 Análisis sintáctico</h3>
+  <p>Gramática libre de contexto G = (V, T, P, S), de clase LL(1): cada alternativa se decide con un solo token de preanálisis.</p>
+  <p><strong>V</strong> = {{ '{' }}{{ no_terminales|join(', ') }}{{ '}' }} · <strong>T</strong> = {{ '{' }}{{ terminales|join(', ') }}{{ '}' }} · <strong>S</strong> = Pedido</p>
+  <pre class="codigo">{{ gramatica|join('\n') }}</pre>
+  {% if resultados %}
+  {% for r in resultados %}
+  <details>
+    <summary>Árbol de derivación — línea {{ r.n }}: <code>{{ r.cadena }}</code></summary>
+    {% if r.sintaxis.valido %}
+      <pre class="codigo">{{ r.sintaxis.arbol }}</pre>
+      <p>Producciones aplicadas (derivación por la izquierda):</p>
+      <ol>{% for p in r.sintaxis.producciones %}<li><code>{{ p }}</code></li>{% endfor %}</ol>
+    {% else %}
+      <p class="alerta">Error sintáctico en la posición {{ r.sintaxis.error.posicion }}: {{ r.sintaxis.error.mensaje }}</p>
+    {% endif %}
+  </details>
+  {% endfor %}
+  {% endif %}
+
+  <h3>3.3 Análisis semántico</h3>
+  {% if resultados %}
+    {% for r in resultados if r.semantica %}
+    <details>
+      <summary>Atributos — línea {{ r.n }}: <code>{{ r.cadena }}</code></summary>
+      <div class="tabla-scroll"><table>
+        <thead><tr><th>Nodo</th><th>Lexema</th><th>Tipo de atributo</th><th>Acción semántica</th><th>Valor</th></tr></thead>
+        <tbody>{% for nodo, lex, tipo, accion, valor in r.semantica.atributos %}
+          <tr><td><code>{{ nodo }}</code></td><td><code>{{ lex }}</code></td><td>{{ tipo }}</td><td>{{ accion }}</td><td>{{ valor }}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      {% for e in r.semantica.errores %}<p class="alerta">{{ e }}</p>{% endfor %}
+    </details>
+    {% endfor %}
+  {% else %}
+  <p class="vacio">Los atributos de cada pedido válido aparecerán aquí.</p>
+  {% endif %}
+</section>
+{% endblock %}

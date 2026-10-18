@@ -1,0 +1,7 @@
+# Archivo de ejemplo: un pedido por línea (las líneas con # se ignoran)
+PED-045-M12-C03
+PED-102-D-B02+S01
+PED-007-L-C01+B02+S03
+PED-45-M12-C03
+PED-045-M12-Z99
+PED-000-M12-C03

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Autómatas · Analizador de pedidos{% endblock %}
+{% block contenido %}
+<section class="bloque">
+  <h1>Autómatas de cada token</h1>
+  <p class="enunciado">Para cada expresión regular se construye el AFND (Thompson), se convierte a AFD (subconjuntos) y se muestran quíntupla, tabla y transiciones. Los gráficos se generan desde código DOT.</p>
+  <p>
+    {% if completo %}
+      AFD completo, con estado trampa. <a href="{{ url_for('main.automatas') }}">Ver AFD parcial</a>
+    {% else %}
+      AFD parcial: las transiciones no definidas (∅) rechazan la cadena. <a href="{{ url_for('main.automatas', completo=1) }}">Ver AFD completo con estado trampa</a>
+    {% endif %}
+  </p>
+  <nav class="indice">{% for f in fichas %}<a href="#f{{ loop.index }}">{{ f.nombre }}</a>{% endfor %}</nav>
+</section>
+
+{% for f in fichas %}
+<section class="bloque" id="f{{ loop.index }}">
+  <h2>{{ f.nombre }}</h2>
+  <p>{{ f.descripcion }}</p>
+  <p>Expresión regular: <code>{{ f.er }}</code></p>
+
+  <div class="par">
+    <figure>
+      <figcaption>AFND (Thompson)</figcaption>
+      <div class="grafo" data-dot="{{ f.afnd_dot }}"></div>
+    </figure>
+    <figure>
+      <figcaption>AFD (subconjuntos)</figcaption>
+      <div class="grafo" data-dot="{{ f.afd_dot }}"></div>
+    </figure>
+  </div>
+
+  <h3>Quíntupla del AFD</h3>
+  <p class="quintupla">M = (Q, Σ, δ, q₀, F)</p>
+  <ul>
+    <li>Q = {{ f.quintupla.Q }}</li>
+    <li>Σ = {{ f.quintupla.Sigma }}</li>
+    <li>δ: {{ f.quintupla.delta }}</li>
+    <li>q₀ = {{ f.quintupla.q0 }}</li>
+    <li>F = {{ f.quintupla.F }}</li>
+  </ul>
+
+  <h3>Tabla de transiciones</h3>
+  <div class="tabla-scroll"><table class="tabla-delta">
+    <thead><tr><th>δ</th>{% for a in f.tabla.encabezado %}<th>{{ a }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for fila in f.tabla.filas %}
+      <tr><th>{% if fila.inicial %}→{% endif %}{% if fila.final %}*{% endif %}{{ fila.estado }}</th>{% for c in fila.celdas %}<td class="{{ 'vacia' if c == '∅' }}">{{ c }}</td>{% endfor %}</tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="nota">→ estado inicial · * estado de aceptación · ∅ sin transición</p>
+
+  <h3>Transiciones</h3>
+  <p class="nota">Una llave como {0-9} resume una transición por cada dígito.</p>
+  <ul class="transiciones">{% for t in f.transiciones %}<li><code>{{ t }}</code></li>{% endfor %}</ul>
+
+  <h3>Composición de estados (AFND → AFD)</h3>
+  <ul class="transiciones">{% for q, ns in f.afd.composicion.items() %}<li><code>{{ q }} = {{ '{' }}{{ ns|join(', ') }}{{ '}' }}</code></li>{% endfor %}</ul>
+
+  <details>
+    <summary>Código DOT generado</summary>
+    <pre class="codigo">{{ f.afnd_dot }}</pre>
+    <pre class="codigo">{{ f.afd_dot }}</pre>
+  </details>
+</section>
+{% endfor %}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@viz-js/viz@3.2.4/lib/viz-standalone.js"></script>
+{% endblock %}

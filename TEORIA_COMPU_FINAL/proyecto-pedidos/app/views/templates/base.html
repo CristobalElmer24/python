@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Analizador de pedidos{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+<body>
+  <header class="barra">
+    <a class="marca" href="{{ url_for('main.index') }}">Comanda<span>Check</span></a>
+    <nav>
+      <a href="{{ url_for('main.index') }}" {% if request.endpoint == 'main.index' %}aria-current="page"{% endif %}>Analizador</a>
+      <a href="{{ url_for('main.automatas') }}" {% if request.endpoint == 'main.automatas' %}aria-current="page"{% endif %}>Autómatas</a>
+    </nav>
+  </header>
+  <main>{% block contenido %}{% endblock %}</main>
+  <footer>Teoría de Computación · USIL · Elmer Jesús Cristobal Tito · 2026-II</footer>
+  {% block scripts %}{% endblock %}
+  <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+</body>
+</html>
